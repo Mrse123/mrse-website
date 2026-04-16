@@ -4,50 +4,18 @@ import {
   Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2
 } from 'lucide-react';
 
-// 飞书应用配置
-const FEISHU_CONFIG = {
-  appId: 'cli_a9544caa4e639bd8',
-  appSecret: 'gzfYVifWaNNvfMpHJz0ExgnaD0SvGilM',
-  appToken: 'LF3YbS1fOaqPTWsWo4bcKLe1nRh',
-  tableId: 'tblMqnYAwquMzMyQ',
-};
+// 飞书数据获取 — 自动适配本地开发和 Netlify 部署环境
+const fetchFeishuRecords = async (): Promise<any[]> => {
+  // 生产环境走 Netlify Function（服务端代理，AppSecret 安全）
+  const apiUrl = import.meta.env.DEV
+    ? '/feishu-api/proxy/records'  // 开发环境：Vite proxy 转发
+    : '/.netlify/functions/feishu-proxy';  // 生产环境：Netlify Function
 
-// 飞书 API 调用封装
-const getAccessToken = async (): Promise<string> => {
-  const res = await fetch('/feishu-api/open-apis/auth/v3/tenant_access_token/internal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      app_id: FEISHU_CONFIG.appId,
-      app_secret: FEISHU_CONFIG.appSecret,
-    }),
-  });
+  const res = await fetch(apiUrl);
+  if (!res.ok) throw new Error('请求失败: ' + res.status);
   const data = await res.json();
-  if (data.code !== 0) throw new Error('获取 token 失败: ' + data.msg);
-  return data.tenant_access_token;
-};
-
-const fetchAllRecords = async (token: string): Promise<any[]> => {
-  const allRecords: any[] = [];
-  let pageToken = '';
-  let hasMore = true;
-
-  while (hasMore) {
-    let apiUrl = '/feishu-api/open-apis/bitable/v1/apps/' + FEISHU_CONFIG.appToken + '/tables/' + FEISHU_CONFIG.tableId + '/records?page_size=500';
-    if (pageToken) apiUrl += '&page_token=' + encodeURIComponent(pageToken);
-
-    const res = await fetch(apiUrl, {
-      headers: { 'Authorization': 'Bearer ' + token },
-    });
-    const data = await res.json();
-    if (data.code !== 0) throw new Error('获取记录失败: ' + data.msg);
-
-    allRecords.push(...(data.data.items || []));
-    hasMore = data.data.has_more || false;
-    pageToken = data.data.page_token || '';
-  }
-
-  return allRecords;
+  if (data.code !== 0) throw new Error(data.msg || '数据加载失败');
+  return data.data;
 };
 
 const extractFieldValue = (field: any): string => {
@@ -104,8 +72,7 @@ const ClientCenterNoLayout = () => {
     setLoading(true);
     setError('');
     try {
-      const token = await getAccessToken();
-      const records = await fetchAllRecords(token);
+      const records = await fetchFeishuRecords();
       setAllRecords(records);
       setRecordsLoaded(true);
     } catch (e: any) {
