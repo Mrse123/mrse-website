@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2
+  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2, ClipboardList
 } from 'lucide-react';
+
+import projectDataJson from '../data/project_data.json';
 
 // 飞书数据获取 — 自动适配本地开发和 Netlify 部署环境
 const fetchFeishuRecords = async (): Promise<any[]> => {
-  // 生产环境走 Netlify Function（服务端代理，AppSecret 安全）
   const apiUrl = import.meta.env.DEV
-    ? '/feishu-api/proxy/records'  // 开发环境：Vite proxy 转发
-    : '/.netlify/functions/feishu-proxy';  // 生产环境：Netlify Function
+    ? '/feishu-api/proxy/records'
+    : '/.netlify/functions/feishu-proxy';
 
   const res = await fetch(apiUrl);
   if (!res.ok) throw new Error('请求失败: ' + res.status);
@@ -37,16 +38,47 @@ const extractNumber = (field: any): string => {
   return '';
 };
 
+type ProjectItem = {
+  project: string;
+  stage: string;
+  manager: string;
+  contract_amount: string | null;
+  received_amount: string | null;
+  pending_amount: string | null;
+  year: string | null;
+  cert_expiry: string | null;
+  latest_record: string | null;
+  remark: string | null;
+};
+
+const projectData: Record<string, ProjectItem[]> = projectDataJson as any;
+
+const getStageStyle = (stage: string) => {
+  if (!stage) return { bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
+  if (stage.includes('已通过') || stage.includes('补贴')) return { bg: '#dcfce7', color: '#166534', border: '#bbf7d0' };
+  if (stage.includes('终止')) return { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
+  if (stage.includes('编写中') || stage.includes('收集中')) return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
+  if (stage.includes('已申报')) return { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+  if (stage.includes('已结单')) return { bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
+  if (stage.includes('意向') || stage.includes('可推')) return { bg: '#ede9fe', color: '#5b21b6', border: '#ddd6fe' };
+  return { bg: '#f1f5f9', color: '#475569', border: '#e2e8f0' };
+};
+
 const features = [
   {
     icon: <Building2 size={32} />,
     title: '公司检索',
-    desc: '输入公司名称，快速匹配并定位专利年费数据'
+    desc: '输入公司名称，快速匹配并定位专利年费和项目进度数据'
   },
   {
     icon: <FileText size={32} />,
     title: '年费明细',
     desc: '展示每项专利的到期日、缴费金额及通知状态'
+  },
+  {
+    icon: <ClipboardList size={32} />,
+    title: '项目进度',
+    desc: '查看所有申报项目的进度、客户管家和最新动态'
   },
   {
     icon: <ShieldCheck size={32} />,
@@ -59,14 +91,16 @@ const ClientCenterNoLayout = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [patentPage, setPatentPage] = useState(1);
+  const [projectPage, setProjectPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [recordsLoaded, setRecordsLoaded] = useState(false);
   const [error, setError] = useState('');
-  const itemsPerPage = 5;
+  const [activeTab, setActiveTab] = useState<'patent' | 'project'>('patent');
+  const patentPerPage = 5;
+  const projectPerPage = 10;
 
-  // 加载全部数据（输入搜索词时自动触发）
   const loadRecords = useCallback(async () => {
     if (recordsLoaded || loading) return;
     setLoading(true);
@@ -82,31 +116,32 @@ const ClientCenterNoLayout = () => {
     }
   }, [recordsLoaded, loading]);
 
-  // 当搜索词变化时自动加载数据
   React.useEffect(() => {
     if (searchTerm.trim() && !recordsLoaded && !loading) {
       loadRecords();
     }
   }, [searchTerm, recordsLoaded, loading, loadRecords]);
 
-  // 从全部记录中提取公司列表
+  // 合并年费公司名 + 项目台账公司名
   const companySet = useMemo(() => {
     const set = new Set<string>();
     allRecords.forEach(r => {
       const name = extractFieldValue(r.fields['公司名称']);
       if (name) set.add(name);
     });
+    Object.keys(projectData).forEach(name => {
+      if (name) set.add(name);
+    });
     return Array.from(set).sort();
   }, [allRecords]);
 
-  // 模糊搜索公司
   const filteredCompanies = useMemo(() => {
     if (!searchTerm.trim()) return [];
     const term = searchTerm.toLowerCase();
     return companySet.filter(c => c.toLowerCase().includes(term));
   }, [searchTerm, companySet]);
 
-  // 选中公司的专利记录
+  // 年费数据
   const companyPatents = useMemo(() => {
     if (!selectedCompany || !allRecords.length) return [];
     return allRecords
@@ -121,19 +156,38 @@ const ClientCenterNoLayout = () => {
       }));
   }, [selectedCompany, allRecords]);
 
-  const totalPages = Math.ceil(companyPatents.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentPatents = companyPatents.slice(startIndex, endIndex);
+  // 项目数据
+  const companyProjects = useMemo(() => {
+    if (!selectedCompany) return [];
+    // 精确匹配
+    if (projectData[selectedCompany]) return projectData[selectedCompany];
+    // 模糊匹配
+    for (const key of Object.keys(projectData)) {
+      if (key === selectedCompany) return projectData[key];
+    }
+    return [];
+  }, [selectedCompany]);
+
+  const patentTotalPages = Math.ceil(companyPatents.length / patentPerPage) || 1;
+  const patentStart = (patentPage - 1) * patentPerPage;
+  const patentEnd = patentStart + patentPerPage;
+  const currentPatents = companyPatents.slice(patentStart, patentEnd);
+
+  const projectTotalPages = Math.ceil(companyProjects.length / projectPerPage) || 1;
+  const projectStart = (projectPage - 1) * projectPerPage;
+  const projectEnd = projectStart + projectPerPage;
+  const currentProjects = companyProjects.slice(projectStart, projectEnd);
 
   const notified = companyPatents.filter(p => p['通知状态'] === '已通知').length;
-  const pending = companyPatents.filter(p => p['通知状态'] === '待通知').length;
+  const pendingNotif = companyPatents.filter(p => p['通知状态'] === '待通知').length;
   const noNeed = companyPatents.filter(p => p['通知状态'] === '无需通知').length;
 
   const handleSearch = async (company: string) => {
     setSelectedCompany(company);
     setShowResults(true);
-    setCurrentPage(1);
+    setPatentPage(1);
+    setProjectPage(1);
+    setActiveTab('patent');
     if (!recordsLoaded) {
       await loadRecords();
     }
@@ -147,11 +201,8 @@ const ClientCenterNoLayout = () => {
     setSearchTerm('');
     setSelectedCompany(null);
     setShowResults(false);
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setPatentPage(1);
+    setProjectPage(1);
   };
 
   const getStatusStyle = (status: string) => {
@@ -162,6 +213,35 @@ const ClientCenterNoLayout = () => {
       case '任务已分配': return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
       default: return { bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
     }
+  };
+
+  // 分页组件
+  const Pagination = ({ current, total, onChange }: { current: number; total: number; onChange: (p: number) => void }) => {
+    if (total <= 1) return null;
+    return (
+      <div style={{ padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0' }}>
+        <span style={{ fontSize: 13, color: '#94a3b8' }}>第 {current} / {total} 页</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => onChange(current - 1)} disabled={current === 1} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', background: current === 1 ? '#f1f5f9' : '#e2e8f0', color: current === 1 ? '#cbd5e1' : '#475569' }}>上一页</button>
+          {Array.from({ length: Math.min(total, 7) }, (_, i) => {
+            let page: number;
+            if (total <= 7) {
+              page = i + 1;
+            } else if (current <= 4) {
+              page = i + 1;
+            } else if (current >= total - 3) {
+              page = total - 6 + i;
+            } else {
+              page = current - 3 + i;
+            }
+            return (
+              <button key={page} onClick={() => onChange(page)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', background: current === page ? '#1a3a5c' : '#e2e8f0', color: current === page ? '#fff' : '#475569', minWidth: 36 }}>{page}</button>
+            );
+          })}
+          <button onClick={() => onChange(current + 1)} disabled={current === total} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', background: current === total ? '#f1f5f9' : '#e2e8f0', color: current === total ? '#cbd5e1' : '#475569' }}>下一页</button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -188,11 +268,11 @@ const ClientCenterNoLayout = () => {
                 <span style={{ color: '#c8a951', fontSize: 13, fontWeight: 500 }}>数据实时同步 · 飞书直连</span>
               </div>
               <h1 style={{ fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 800, color: '#fff', lineHeight: 1.3, marginBottom: 20 }}>
-                专利年费<br />
-                <span style={{ color: '#c8a951' }}>智能监控系统</span>
+                客户服务中心<br />
+                <span style={{ color: '#c8a951' }}>年费 & 项目查询</span>
               </h1>
               <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.9, marginBottom: 36, maxWidth: 500 }}>
-                一键搜索公司名称，即可查看专利年费到期情况。数据从飞书表格实时获取，修改即时生效，无需手动同步。
+                一键搜索公司名称，即可查看专利年费到期情况和项目申报进度。数据从飞书表格实时获取，修改即时生效。
               </p>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <Link to="/services" className="btn-primary">了解服务</Link>
@@ -268,18 +348,20 @@ const ClientCenterNoLayout = () => {
       </section>
 
       {/* 搜索结果区域 */}
-      {showResults && companyPatents.length > 0 && (
+      {showResults && (companyPatents.length > 0 || companyProjects.length > 0) && (
         <section id="search-results" style={{ background: '#f8fafc', padding: '80px 0' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
-            <h2 className="section-title">专利年费详情</h2>
+            <h2 className="section-title">{selectedCompany}</h2>
             <div className="divider" />
-            <p className="section-sub">{selectedCompany} 的专利年费管理概览（数据来自飞书表格）</p>
+            <p className="section-sub">客户数据概览（数据来自飞书表格）</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 40, marginTop: 36 }} className="stats-grid">
+            {/* 统计卡片 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 40, marginTop: 36 }} className="stats-grid">
               {[
                 { num: companyPatents.length, label: '专利总数', color: '#1a3a5c' },
+                { num: companyProjects.length, label: '项目总数', color: '#7c3aed' },
                 { num: notified, label: '已通知', color: '#16a34a' },
-                { num: pending, label: '待通知', color: '#ca8a04' },
+                { num: pendingNotif, label: '待通知', color: '#ca8a04' },
                 { num: noNeed, label: '无需通知', color: '#64748b' },
               ].map((s, i) => (
                 <div key={i} className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
@@ -289,79 +371,170 @@ const ClientCenterNoLayout = () => {
               ))}
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
-              <div style={{ background: 'linear-gradient(135deg, #1a3a5c, #2563a8)', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 17, marginBottom: 4 }}>{selectedCompany}</h3>
-                  <span style={{ color: '#94a3b8', fontSize: 13 }}>第 {currentPage} / {totalPages} 页，共 {companyPatents.length} 条记录</span>
-                </div>
-                <button onClick={handleReset} style={{ padding: '8px 18px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  重新搜索 <ArrowRight size={14} />
-                </button>
-              </div>
+            {/* Tab 切换 */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 0 }}>
+              <button
+                onClick={() => setActiveTab('patent')}
+                style={{
+                  padding: '14px 28px', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                  border: 'none', borderTopLeftRadius: 12,
+                  background: activeTab === 'patent' ? '#1a3a5c' : '#e2e8f0',
+                  color: activeTab === 'patent' ? '#fff' : '#64748b',
+                }}
+              >
+                <FileText size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                专利年费 ({companyPatents.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('project')}
+                style={{
+                  padding: '14px 28px', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                  border: 'none', borderTopRightRadius: 12,
+                  background: activeTab === 'project' ? '#7c3aed' : '#e2e8f0',
+                  color: activeTab === 'project' ? '#fff' : '#64748b',
+                }}
+              >
+                <ClipboardList size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                项目进度 ({companyProjects.length})
+              </button>
+            </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      {['专利号', '专利名称', '年费到期日', '缴费金额', '通知状态', '缴费截止日'].map(h => (
-                        <th key={h} style={{ padding: '14px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentPatents.map((patent, index) => {
-                      const statusStyle = getStatusStyle(patent['通知状态']);
-                      return (
-                        <tr key={index} style={{ borderBottom: index < currentPatents.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.15s' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{patent['专利号']}</td>
-                          <td style={{ padding: '16px 20px', fontSize: 14, color: '#475569', maxWidth: 280 }}>{patent['专利名称']}</td>
-                          <td style={{ padding: '16px 20px', fontSize: 14, color: '#475569' }}>{patent['年费到期日'] || '-'}</td>
-                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 600, color: patent['缴费金额'] ? '#1e293b' : '#94a3b8' }}>{patent['缴费金额'] ? '\u00A5' + patent['缴费金额'] : '-'}</td>
-                          <td style={{ padding: '16px 20px' }}>
-                            <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: statusStyle.bg, color: statusStyle.color, border: '1px solid ' + statusStyle.border }}>
-                              {patent['通知状态'] || '-'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px 20px', fontSize: 14, color: '#475569' }}>{patent['缴费截止日'] || '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {totalPages > 1 && (
-                <div style={{ padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: 13, color: '#94a3b8' }}>显示第 {startIndex + 1}-{Math.min(endIndex, companyPatents.length)} 条</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', background: currentPage === 1 ? '#f1f5f9' : '#e2e8f0', color: currentPage === 1 ? '#cbd5e1' : '#475569' }}>上一页</button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button key={page} onClick={() => handlePageChange(page)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', background: currentPage === page ? '#1a3a5c' : '#e2e8f0', color: currentPage === page ? '#fff' : '#475569', minWidth: 36 }}>{page}</button>
-                    ))}
-                    <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', background: currentPage === totalPages ? '#f1f5f9' : '#e2e8f0', color: currentPage === totalPages ? '#cbd5e1' : '#475569' }}>下一页</button>
+            {/* 年费表格 */}
+            {activeTab === 'patent' && (
+              <div style={{ background: '#fff', borderRadius: '0 16px 16px 16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'linear-gradient(135deg, #1a3a5c, #2563a8)', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 2 }}>专利年费明细</h3>
+                    <span style={{ color: '#94a3b8', fontSize: 12 }}>共 {companyPatents.length} 条记录</span>
                   </div>
+                  <button onClick={handleReset} style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    重新搜索 <ArrowRight size={14} />
+                  </button>
                 </div>
-              )}
-            </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        {['专利号', '专利名称', '年费到期日', '缴费金额', '通知状态', '缴费截止日'].map(h => (
+                          <th key={h} style={{ padding: '14px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentPatents.map((patent, index) => {
+                        const statusStyle = getStatusStyle(patent['通知状态']);
+                        return (
+                          <tr key={index} style={{ borderBottom: index < currentPatents.length - 1 ? '1px solid #f1f5f9' : 'none' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{patent['专利号']}</td>
+                            <td style={{ padding: '14px 20px', fontSize: 13, color: '#475569', maxWidth: 240 }}>{patent['专利名称']}</td>
+                            <td style={{ padding: '14px 20px', fontSize: 13, color: '#475569' }}>{patent['年费到期日'] || '-'}</td>
+                            <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 600, color: patent['缴费金额'] ? '#1e293b' : '#94a3b8' }}>{patent['缴费金额'] ? '¥' + patent['缴费金额'] : '-'}</td>
+                            <td style={{ padding: '14px 20px' }}>
+                              <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: statusStyle.bg, color: statusStyle.color, border: '1px solid ' + statusStyle.border }}>
+                                {patent['通知状态'] || '-'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 20px', fontSize: 13, color: '#475569' }}>{patent['缴费截止日'] || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination current={patentPage} total={patentTotalPages} onChange={setPatentPage} />
+                <div style={{ padding: '12px 28px 16px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {[
+                    { label: '已通知', desc: '提醒已发送给客户', color: '#16a34a' },
+                    { label: '待通知', desc: '即将到期，待发送提醒', color: '#ca8a04' },
+                    { label: '无需通知', desc: '无年费或已缴费', color: '#64748b' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
+                      <span style={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>{item.label}</span>
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>- {item.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            <div style={{ marginTop: 24, padding: '20px 24px', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {[
-                { label: '已通知', desc: '提醒已发送给客户', color: '#16a34a' },
-                { label: '待通知', desc: '即将到期，待发送提醒', color: '#ca8a04' },
-                { label: '无需通知', desc: '无年费或已缴费', color: '#64748b' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
-                  <span style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{item.label}</span>
-                  <span style={{ fontSize: 13, color: '#94a3b8' }}>- {item.desc}</span>
+            {/* 项目表格 */}
+            {activeTab === 'project' && (
+              <div style={{ background: '#fff', borderRadius: '0 16px 16px 16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 2 }}>项目申报进度</h3>
+                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>共 {companyProjects.length} 个项目</span>
+                  </div>
+                  <button onClick={handleReset} style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    重新搜索 <ArrowRight size={14} />
+                  </button>
                 </div>
-              ))}
-            </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#faf5ff' }}>
+                        {['项目名称', '项目阶段', '申报年份', '客户管家', '合同金额', '收款金额', '待收款', '证书有效期'].map(h => (
+                          <th key={h} style={{ padding: '14px 18px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #e9d5ff' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentProjects.map((proj, index) => {
+                        const stageStyle = getStageStyle(proj.stage || '');
+                        return (
+                          <tr key={index} style={{ borderBottom: index < currentProjects.length - 1 ? '1px solid #f5f3ff' : 'none' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#faf5ff')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            <td style={{ padding: '14px 18px', fontSize: 13, fontWeight: 600, color: '#1e293b', maxWidth: 220 }}>{proj.project || '-'}</td>
+                            <td style={{ padding: '14px 18px' }}>
+                              <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: stageStyle.bg, color: stageStyle.color, border: '1px solid ' + stageStyle.border }}>
+                                {proj.stage || '-'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#475569' }}>{proj.year || '-'}</td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#475569', fontWeight: 500 }}>{proj.manager || '-'}</td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#1e293b', fontWeight: 600 }}>{proj.contract_amount || '-'}</td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#16a34a', fontWeight: 500 }}>{proj.received_amount || '-'}</td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#dc2626', fontWeight: 500 }}>{proj.pending_amount || '-'}</td>
+                            <td style={{ padding: '14px 18px', fontSize: 13, color: '#475569' }}>{proj.cert_expiry || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination current={projectPage} total={projectTotalPages} onChange={setProjectPage} />
+                <div style={{ padding: '12px 28px 16px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                  {[
+                    { label: '已通过/补贴', desc: '项目已完成', color: '#16a34a' },
+                    { label: '编写中/收集中', desc: '正在进行', color: '#1e40af' },
+                    { label: '已申报', desc: '等待结果', color: '#92400e' },
+                    { label: '已终止', desc: '项目停止', color: '#991b1b' },
+                    { label: '意向/可推', desc: '潜在业务', color: '#5b21b6' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
+                      <span style={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>{item.label}</span>
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>- {item.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <style>{`@media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr) !important; } }`}</style>
+        </section>
+      )}
+
+      {/* 搜索了但两家表都没数据 */}
+      {showResults && companyPatents.length === 0 && companyProjects.length === 0 && !loading && (
+        <section id="search-results" style={{ background: '#f8fafc', padding: '80px 0', textAlign: 'center' }}>
+          <Building2 size={48} style={{ color: '#94a3b8', margin: '0 auto 16px' }} />
+          <p style={{ color: '#475569', fontSize: 16 }}>暂无 "{selectedCompany}" 的数据</p>
+          <button onClick={handleReset} style={{ marginTop: 16, padding: '10px 24px', background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>重新搜索</button>
         </section>
       )}
 
@@ -388,8 +561,8 @@ const ClientCenterNoLayout = () => {
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
             <h2 className="section-title">使用指南</h2>
             <div className="divider" />
-            <p className="section-sub">简单三步，轻松管理专利年费</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 28, marginTop: 36 }}>
+            <p className="section-sub">简单三步，轻松查询企业数据</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 28, marginTop: 36 }}>
               {features.map((f, i) => (
                 <div key={i} className="card" style={{ textAlign: 'center' }}>
                   <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #1a3a5c, #2563a8)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#c8a951' }}>
