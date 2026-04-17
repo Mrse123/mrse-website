@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import {
   Sparkles, ArrowRight, Building2, TrendingUp,
-  Loader2, CheckCircle, AlertCircle, Phone, RefreshCw
+  Loader2, CheckCircle, AlertCircle, Phone, RefreshCw,
+  Search, Globe
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -35,6 +36,7 @@ type Report = {
   summary: string
   items: ReportItem[]
   totalEstimate: string
+  sources?: string[]
 }
 
 export default function PolicyRadar() {
@@ -42,6 +44,7 @@ export default function PolicyRadar() {
   const [industry, setIndustry] = useState('')
   const [revenue, setRevenue] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingPhase, setLoadingPhase] = useState<'searching' | 'analyzing'>('searching')
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
 
@@ -58,6 +61,12 @@ export default function PolicyRadar() {
     setError('')
     setLoading(true)
     setReport(null)
+    setLoadingPhase('searching')
+
+    // 3秒后自动切换到分析阶段（实际后端是串行的，这里只是给用户更好的体验）
+    const phaseTimer = setTimeout(() => {
+      setLoadingPhase('analyzing')
+    }, 3000)
 
     try {
       const apiUrl = import.meta.env.DEV
@@ -83,7 +92,9 @@ export default function PolicyRadar() {
     } catch (err: any) {
       setError(err.message || '生成报告失败，请稍后重试')
     } finally {
+      clearTimeout(phaseTimer)
       setLoading(false)
+      setLoadingPhase('searching')
     }
   }
 
@@ -133,7 +144,7 @@ export default function PolicyRadar() {
             AI 政策雷达
           </h1>
           <p style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.7 }}>
-            输入企业基本信息，AI 智能匹配国家及地方政策，30秒生成专属报告
+            输入企业基本信息，AI 联网搜索最新政策，智能匹配生成专属报告
           </p>
         </div>
       </div>
@@ -298,7 +309,7 @@ export default function PolicyRadar() {
               </button>
 
               <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
-                完全免费 · 无需注册 · 结果仅供参考
+                完全免费 · 无需注册 · AI联网搜索实时政策
               </p>
             </div>
 
@@ -312,43 +323,80 @@ export default function PolicyRadar() {
         {/* Loading State */}
         {loading && (
           <div style={{
-            background: '#fff', borderRadius: 20, padding: '80px 40px',
+            background: '#fff', borderRadius: 20, padding: '60px 40px',
             boxShadow: '0 20px 60px rgba(0,0,0,0.08)', textAlign: 'center',
             border: '1px solid #e2e8f0'
           }}>
             <div style={{
               width: 80, height: 80, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #b45309, #d97706)',
+              background: loadingPhase === 'searching'
+                ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
+                : 'linear-gradient(135deg, #b45309, #d97706)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 24px', color: '#fff'
             }}>
               <Loader2 size={36} className="spin" />
             </div>
-            <h2 style={{ fontWeight: 700, fontSize: 20, color: '#1a3a5c', marginBottom: 12 }}>
-              AI 正在分析中...
+            <h2 style={{ fontWeight: 700, fontSize: 20, color: '#1a3a5c', marginBottom: 24 }}>
+              {loadingPhase === 'searching' ? '正在联网搜索最新政策...' : 'AI 正在分析匹配结果...'}
             </h2>
-            <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.7 }}>
-              正在匹配 20+ 项政策，预计需要 15-30 秒
-            </p>
-            <div style={{
-              maxWidth: 300, margin: '24px auto 0', height: 6,
-              background: '#e2e8f0', borderRadius: 3, overflow: 'hidden'
-            }}>
-              <div style={{
-                width: '60%', height: '100%',
-                background: 'linear-gradient(90deg, #b45309, #d97706)',
-                borderRadius: 3,
-                animation: 'loading 2s ease-in-out infinite'
-              }} />
+
+            {/* 进度步骤 */}
+            <div style={{ maxWidth: 340, margin: '0 auto 28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, justifyContent: 'center' }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: loadingPhase === 'searching'
+                    ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
+                    : '#22c55e',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', flexShrink: 0
+                }}>
+                  {loadingPhase === 'searching' ? <Search size={18} /> : <CheckCircle size={18} />}
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: loadingPhase === 'searching' ? '#1a3a5c' : '#22c55e' }}>
+                    联网搜索政策
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {loadingPhase === 'searching' ? '搜索中...' : '搜索完成'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ width: 2, height: 12, background: '#e2e8f0', margin: '0 auto' }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, justifyContent: 'center' }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: loadingPhase === 'analyzing'
+                    ? 'linear-gradient(135deg, #b45309, #d97706)'
+                    : '#e2e8f0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: loadingPhase === 'analyzing' ? '#fff' : '#94a3b8',
+                  flexShrink: 0
+                }}>
+                  <Sparkles size={18} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: loadingPhase === 'analyzing' ? '#1a3a5c' : '#94a3b8' }}>
+                    AI 分析生成报告
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {loadingPhase === 'analyzing' ? '分析中...' : '等待搜索完成'}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.7, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+              <Globe size={14} />
+              正在搜索最新政策数据，预计需要 20-40 秒
+            </p>
+
             <style>{`
               @keyframes spin { to { transform: rotate(360deg) } }
               .spin { animation: spin 1s linear infinite; }
-              @keyframes loading {
-                0% { width: 0%; margin-left: 0; }
-                50% { width: 60%; margin-left: 20%; }
-                100% { width: 0%; margin-left: 100%; }
-              }
             `}</style>
           </div>
         )}
@@ -485,6 +533,38 @@ export default function PolicyRadar() {
                     )
                   })}
                 </div>
+
+                {/* Sources */}
+                {report.sources && report.sources.length > 0 && (
+                  <div style={{
+                    marginTop: 24, padding: '16px 20px', borderRadius: 10,
+                    background: '#f8fafc', border: '1px solid #e2e8f0',
+                  }}>
+                    <div style={{
+                      fontWeight: 600, fontSize: 12, color: '#64748b',
+                      marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6
+                    }}>
+                      <Globe size={13} />
+                      信息来源（联网搜索）
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {report.sources.slice(0, 5).map((url: string, i: number) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 12, color: '#2563eb', textDecoration: 'none',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {url}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -500,7 +580,7 @@ export default function PolicyRadar() {
                 想要获取详细的申报方案？
               </h3>
               <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.8, marginBottom: 28, maxWidth: 500, margin: '0 auto 28px' }}>
-                以上结果为 AI 初步匹配，实际申报需专业评估。<br />
+                以上结果由 AI 联网搜索最新政策并智能匹配生成，仅供参考。<br />
                 联系我们的专家，获取一对一免费咨询和定制化申报方案。
               </p>
               <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
