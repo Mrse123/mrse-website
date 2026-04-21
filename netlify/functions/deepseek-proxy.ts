@@ -96,57 +96,23 @@ async function searchPolicies(company: string, industry: string, revenue: string
 
 // 用 DeepSeek 生成完整体检报告（Step 3，单独一次请求）
 async function generateFullReport(company: string, industry: string, revenue: string, companyInfo: string, policyData: any) {
-  const SYSTEM_PROMPT = `你是企业政策体检专家。根据企业信息和政策搜索结果，生成JSON格式的企业政策体检报告。
+  const SYSTEM_PROMPT = `你是企业政策体检专家。根据企业信息和政策搜索结果，生成JSON报告。严格返回JSON，不要返回其他任何内容。
 
-严格返回以下JSON，不要返回其他任何内容：
-{
-  "company": "企业名称",
-  "industry": "行业",
-  "revenue": "营收",
-  "companyProfile": "企业概况（1-2句中文）",
-  "summary": "AI分析摘要（2-3句，概括企业政策申报潜力和最大机会）",
-  "totalEstimate": "预计可获补贴总金额范围（如：50-150万元/年）",
-  "qualifications": [
-    {"name": "资质名称", "status": "已具备/未具备/需补充", "note": "简短说明"}
-  ],
-  "recommendations": [
-    {"name": "专利申请建议", "detail": "具体建议内容，如：申请2件发明专利+5件软著", "impact": "可多获补贴约XX万元"}
-  ],
-  "items": [
-    {
-      "name": "政策名称",
-      "match": "匹配度百分比",
-      "subsidy": "预计补贴金额或优惠",
-      "difficulty": "申报难度",
-      "category": "推荐/可申报/潜力",
-      "deadline": "申报时间（如：每年6-8月，或：常年可申报）",
-      "description": "政策说明（1句）",
-      "reason": "匹配此政策的具体原因",
-      "conditions": [
-        {"name": "条件名称", "status": "满足/不满足/未知", "note": "说明"}
-      ]
-    }
-  ],
-  "sources": ["来源URL"]
-}
+格式：
+{"company":"名称","industry":"行业","revenue":"营收","companyProfile":"1句概况","summary":"1句AI摘要","totalEstimate":"补贴范围","qualifications":[{"name":"资质","status":"已具备/未具备/需补充","note":"说明"}],"recommendations":[{"name":"建议","detail":"内容","impact":"影响"}],"items":[{"name":"政策","match":"85%","subsidy":"金额","difficulty":"低/中/高","category":"推荐/可申报/潜力","description":"1句说明"}],"sources":["url"]}
 
 规则：
-1. 只基于搜索结果生成，不编造政策
-2. items 至少 5-8 个政策，覆盖推荐、可申报、潜力三个等级
-3. category 分为：推荐（匹配度80%+）、可申报（50-80%）、潜力（<50%但值得准备）
-4. 每个政策给出条件对照 conditions，至少3个条件
-5. qualifications 给出企业现有资质评估，至少4项
-6. recommendations 至少2条提升建议
-7. 全部用中文`;
+1.只基于搜索结果，不编造
+2.items 4-6个，分推荐/可申报/潜力
+3.qualifications 3项
+4.recommendations 2条
+5.全部中文，简洁
 
-  const userPrompt = `企业：${company} | 行业：${industry} | 营收：${revenue}
-公司信息：${companyInfo || "未获取到详细信息"}
-
-政策搜索结果：
-${policyData.policyAnswer}
-${policyData.contents}
-
-请生成该企业的政策体检报告。`;
+  const userPrompt = `企业：${company}|行业：${industry}|营收：${revenue}
+公司信息：${companyInfo || "未知"}
+政策搜索：${policyData.policyAnswer || ""}
+${policyData.contents.slice(0, 800)}
+生成报告。`;
 
   const response = await fetch(DEEPSEEK_API_URL, {
     method: "POST",
@@ -160,8 +126,8 @@ ${policyData.contents}
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.2,
-      max_tokens: 3000,
+      temperature: 0.3,
+      max_tokens: 1500,
     }),
   });
 

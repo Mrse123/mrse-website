@@ -77,7 +77,9 @@ export default function PolicyRadar() {
     setLoadingPhase('searching-policy')
 
     try {
-      // === 第一次请求：搜索政策（10秒内） ===
+      // === 第一次请求：搜索政策（15秒超时） ===
+      const controller1 = new AbortController()
+      const timer1 = setTimeout(() => controller1.abort(), 15000)
       const policyRes = await fetch(apiUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,13 +87,17 @@ export default function PolicyRadar() {
           company: companyName.trim(), industry,
           revenue: revenue || '未提供',
         }),
+        signal: controller1.signal,
       })
+      clearTimeout(timer1)
       if (!policyRes.ok) throw new Error('政策搜索失败')
       const pData = await policyRes.json()
       if (pData.error) throw new Error(pData.error)
 
-      // === 第二次请求：DeepSeek 生成报告（20秒内） ===
+      // === 第二次请求：DeepSeek 生成报告（22秒超时） ===
       setLoadingPhase('analyzing')
+      const controller2 = new AbortController()
+      const timer2 = setTimeout(() => controller2.abort(), 22000)
       const reportRes = await fetch(apiUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,7 +106,9 @@ export default function PolicyRadar() {
           revenue: revenue || '未提供',
           companyInfo, policyData: pData,
         }),
+        signal: controller2.signal,
       })
+      clearTimeout(timer2)
       if (!reportRes.ok) throw new Error('报告生成失败')
       const data = await reportRes.json()
       if (data.error) throw new Error(data.error)
@@ -108,7 +116,11 @@ export default function PolicyRadar() {
       setReport(data)
       setStep('report')
     } catch (err: any) {
-      setError(err.message || '生成失败，请重试')
+      if (err.name === 'AbortError') {
+        setError('请求超时，请稍后重试')
+      } else {
+        setError(err.message || '生成失败，请重试')
+      }
       setStep('company-info')
     } finally { setLoading(false) }
   }
