@@ -44,73 +44,41 @@ export default function PolicyRadar() {
   const [loading, setLoading] = useState(false)
   const [loadingPhase, setLoadingPhase] = useState('searching-policy')
   const [error, setError] = useState('')
-  const [companyInfo, setCompanyInfo] = useState('')
   const [report, setReport] = useState<Report | null>(null)
 
   const apiUrl = import.meta.env.DEV
     ? '/deepseek-proxy'
     : '/.netlify/functions/deepseek-proxy'
 
-  // Step 1: 搜索公司
-  const handleSearchCompany = async () => {
+  // Step 1: 直接进入行业选择（不再单独搜索公司）
+  const handleSearchCompany = () => {
     if (!companyName.trim()) { setError('请输入企业名称'); return }
-    setError(''); setLoading(true)
-    try {
-      const res = await fetch(apiUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'search-company', company: companyName.trim() }),
-      })
-      if (!res.ok) throw new Error('请求失败')
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setCompanyInfo(data.companyInfo || '')
-      setStep('company-info')
-    } catch (err: any) {
-      setError(err.message || '搜索失败，请重试')
-    } finally { setLoading(false) }
+    setError('')
+    setStep('company-info')
   }
 
-  // Step 2: 先搜政策（第一次请求），再生成报告（第二次请求）
+  // Step 2: 单次请求生成报告（搜索 + AI 分析一气呵成）
   const handleGenerateReport = async () => {
     if (!industry) { setError('请选择所属行业'); return }
     setError(''); setLoading(true); setStep('loading')
     setLoadingPhase('searching-policy')
 
     try {
-      // === 第一次请求：搜索政策（15秒超时） ===
-      const controller1 = new AbortController()
-      const timer1 = setTimeout(() => controller1.abort(), 15000)
-      const policyRes = await fetch(apiUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'search-policy',
-          company: companyName.trim(), industry,
-          revenue: revenue || '未提供',
-        }),
-        signal: controller1.signal,
-      })
-      clearTimeout(timer1)
-      if (!policyRes.ok) throw new Error('政策搜索失败')
-      const pData = await policyRes.json()
-      if (pData.error) throw new Error(pData.error)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 25000)
 
-      // === 第二次请求：DeepSeek 生成报告（22秒超时） ===
-      setLoadingPhase('analyzing')
-      const controller2 = new AbortController()
-      const timer2 = setTimeout(() => controller2.abort(), 22000)
-      const reportRes = await fetch(apiUrl, {
+      const res = await fetch(apiUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'generate-report',
           company: companyName.trim(), industry,
           revenue: revenue || '未提供',
-          companyInfo, policyData: pData,
         }),
-        signal: controller2.signal,
+        signal: controller.signal,
       })
-      clearTimeout(timer2)
-      if (!reportRes.ok) throw new Error('报告生成失败')
-      const data = await reportRes.json()
+      clearTimeout(timer)
+      if (!res.ok) throw new Error('请求失败，请重试')
+      const data = await res.json()
       if (data.error) throw new Error(data.error)
 
       setReport(data)
@@ -127,7 +95,7 @@ export default function PolicyRadar() {
 
   const handleReset = () => {
     setStep('form'); setCompanyName(''); setIndustry('')
-    setRevenue(''); setCompanyInfo('')
+    setRevenue('')
     setReport(null); setError('')
   }
 
