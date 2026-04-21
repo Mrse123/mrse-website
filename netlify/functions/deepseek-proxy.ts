@@ -24,11 +24,13 @@ async function searchCompanyInfo(company: string) {
     },
     body: JSON.stringify({
       query,
-      search_depth: "basic",
+      search_depth: "advanced",
       max_results: 5,
       include_answer: true,
       include_raw_content: false,
       topic: "general",
+      // 限定中文网站，确保结果为中文
+      include_domains: ["tianyancha.com", "qcc.com", "qixin.com", "aiqicha.baidu.com", "baike.baidu.com"],
     }),
   });
 
@@ -38,19 +40,48 @@ async function searchCompanyInfo(company: string) {
 
   const data = await response.json();
 
-  // 优先使用中文搜索结果内容拼接摘要，不依赖 Tavily answer（可能是英文）
+  // 提取中文搜索结果内容
   const cnResults = (data.results || [])
     .filter((r: any) => r.content && /[\u4e00-\u9fff]/.test(r.content))
     .slice(0, 3);
 
   let answer = "";
   if (cnResults.length > 0) {
-    // 拼接中文摘要，取每个结果前200字
     answer = cnResults
       .map((r: any) => r.content.replace(/\s+/g, " ").trim().slice(0, 200))
       .join("\n");
-  } else if (data.answer && /[\u4e00-\u9fff]/.test(data.answer)) {
-    answer = data.answer;
+  } else {
+    // 中文域名也搜不到，尝试不加域名限制再搜一次
+    const fallbackResp = await fetch(TAVILY_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TAVILY_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query: `${company} 公司 简介 经营范围 注册资本`,
+        search_depth: "basic",
+        max_results: 3,
+        include_answer: true,
+        topic: "general",
+      }),
+    });
+    
+    if (fallbackResp.ok) {
+      const fallbackData = await fallbackResp.json();
+      const fbResults = (fallbackData.results || [])
+        .filter((r: any) => r.content && /[\u4e00-\u9fff]/.test(r.content))
+        .slice(0, 2);
+      if (fbResults.length > 0) {
+        answer = fbResults
+          .map((r: any) => r.content.replace(/\s+/g, " ").trim().slice(0, 200))
+          .join("\n");
+      }
+    }
+    
+    if (!answer) {
+      answer = `已搜索到"${company}"相关信息，请查看下方来源链接了解详情。`;
+    }
   }
 
   return {

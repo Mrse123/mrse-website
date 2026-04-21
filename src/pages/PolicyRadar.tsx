@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Sparkles, ArrowRight, Building2, TrendingUp,
   Loader2, CheckCircle, AlertCircle, Phone, RefreshCw,
-  Search, Globe, FileText, ChevronRight, Info
+  Search, Globe, ChevronRight
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -54,7 +54,7 @@ export default function PolicyRadar() {
 
   // 公司信息
   const [companyInfo, setCompanyInfo] = useState('')
-  const [companySources, setCompanySources] = useState<{ title: string; url: string }[]>([])
+  // 公司信息（后端用，前端不展示）
 
   // 报告
   const [report, setReport] = useState<Report | null>(null)
@@ -89,7 +89,6 @@ export default function PolicyRadar() {
       if (data.error) throw new Error(data.error)
 
       setCompanyInfo(data.companyInfo || '')
-      setCompanySources(data.searchResults || [])
       setStep('company-info')
     } catch (err: any) {
       setError(err.message || '搜索公司信息失败，请稍后重试')
@@ -171,7 +170,6 @@ export default function PolicyRadar() {
     setIndustry('')
     setRevenue('')
     setCompanyInfo('')
-    setCompanySources([])
     setReport(null)
     setError('')
   }
@@ -421,52 +419,6 @@ export default function PolicyRadar() {
                   重新搜索
                 </button>
               </div>
-
-              {companyInfo ? (
-                <div style={{
-                  padding: 20, borderRadius: 14,
-                  background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(37,99,235,0.02))',
-                  border: '1px solid rgba(37,99,235,0.12)',
-                  marginBottom: 20,
-                }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#2563eb', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <FileText size={14} />
-                    企业信息摘要
-                  </div>
-                  <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.8 }}>{companyInfo}</p>
-                </div>
-              ) : (
-                <div style={{
-                  padding: 20, borderRadius: 14,
-                  background: '#fffbeb', border: '1px solid #fde68a',
-                  marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <Info size={18} style={{ color: '#d97706', flexShrink: 0 }} />
-                  <p style={{ color: '#92400e', fontSize: 14, lineHeight: 1.7 }}>
-                    未搜索到该企业的详细信息，您可以直接选择行业继续匹配，AI 将根据行业信息为您推荐政策。
-                  </p>
-                </div>
-              )}
-
-              {/* Source Links */}
-              {companySources.length > 0 && (
-                <div style={{
-                  padding: '12px 16px', borderRadius: 10,
-                  background: '#f8fafc', border: '1px solid #e2e8f0',
-                  marginBottom: 24,
-                }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: '#64748b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Globe size={13} />
-                    信息来源
-                  </div>
-                  {companySources.map((s, i) => (
-                    <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'block', fontSize: 12, color: '#2563eb', textDecoration: 'none', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {s.title}
-                    </a>
-                  ))}
-                </div>
-              )}
 
               {/* Industry Selection */}
               <div style={{ marginBottom: 24 }}>
