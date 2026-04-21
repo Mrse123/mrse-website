@@ -40,7 +40,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
           {
             role: "system",
             content: `你是企业政策体检专家。根据企业信息生成JSON报告。严格只返回JSON，不要markdown。
-格式：{"company":"名称","industry":"行业","revenue":"营收","companyProfile":"1句概况","summary":"50字摘要","totalEstimate":"补贴范围","items":[{"name":"政策名","match":"85%","subsidy":"金额","difficulty":"低/中/高","category":"推荐/可申报/潜力","description":"说明"}]}
+格式：{"company":"名称","industry":"行业","revenue":"营收","companyProfile":"2-3句话概况，包含主营业务、所在地区、成立年限等（如果知道的话）","summary":"80字摘要","totalEstimate":"补贴范围","items":[{"name":"政策名","match":"85%","subsidy":"金额","difficulty":"低/中/高","category":"推荐/可申报/潜力","description":"说明"}]}
 规则：items 4-6个。全部中文。优先推荐河北省及保定市政策，兼顾国家级政策。基于你的知识判断，不编造具体金额。`,
           },
           {
