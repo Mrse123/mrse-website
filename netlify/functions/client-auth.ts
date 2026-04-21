@@ -170,7 +170,6 @@ export const handler: Handler = async (
           body: JSON.stringify({ code: -1, msg: "公司名称或密码错误" }),
         };
       }
-    }
 
       if (action === "register") {
         // 注册新客户
