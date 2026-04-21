@@ -49,7 +49,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
           },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 800,
       }),
     });
 

@@ -3,7 +3,7 @@
   publish = "dist"
 
 [functions.deepseek-proxy]
-  timeout = 26
+  timeout = 30
 
 [[redirects]]
   from = "/*"

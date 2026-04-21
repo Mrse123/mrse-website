@@ -65,7 +65,7 @@ export default function PolicyRadar() {
 
     try {
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 25000)
+      const timer = setTimeout(() => controller.abort(), 60000)
 
       const res = await fetch(apiUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
