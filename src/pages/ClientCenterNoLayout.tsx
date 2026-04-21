@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2, ClipboardList
+  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2, ClipboardList, UserPlus, ArrowLeft
 } from 'lucide-react';
 
 import projectDataJson from '../data/project_data.json';
@@ -131,6 +131,13 @@ const ClientCenterNoLayout = () => {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  // 注册相关
+  const [showRegister, setShowRegister] = useState(false);
+  const [regCompany, setRegCompany] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirm, setRegConfirm] = useState('');
+  const [regError, setRegError] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
   const [patentPage, setPatentPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -264,6 +271,67 @@ const ClientCenterNoLayout = () => {
     setPassword('');
     setAuthError('');
     setAuthVerified(false);
+  };
+
+  // 注册
+  const handleRegister = async () => {
+    const company = regCompany.trim();
+    const pwd = regPassword.trim();
+    const confirm = regConfirm.trim();
+    if (!company) { setRegError('请输入企业名称'); return; }
+    // 企业名称校验：必须包含"公司""有限""集团""大学""医院"等关键词
+    const validNamePattern = /公司|有限|集团|企业|大学|学院|医院|研究所|研究院|中心|事务所|合伙/;
+    if (!validNamePattern.test(company)) {
+      setRegError('请输入合规的企业全称（需包含"公司""有限""集团"等关键词）');
+      return;
+    }
+    if (!pwd) { setRegError('请输入密码'); return; }
+    if (pwd.length < 6) { setRegError('密码长度不能少于6位'); return; }
+    if (pwd !== confirm) { setRegError('两次输入的密码不一致'); return; }
+    setRegLoading(true);
+    setRegError('');
+    try {
+      const res = await fetch('/.netlify/functions/client-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'register', companyName: company, password: pwd }),
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        // 注册成功，自动切到登录
+        setRegCompany('');
+        setRegPassword('');
+        setRegConfirm('');
+        setShowRegister(false);
+        setPendingCompany(company);
+        setPassword('');
+        setAuthError('');
+        setAuthVerified(false);
+      } else {
+        setRegError(data.msg || '注册失败');
+      }
+    } catch {
+      setRegError('网络错误，请稍后重试');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const openRegister = () => {
+    setPendingCompany(null);
+    setShowRegister(true);
+    setRegError('');
+    setRegCompany('');
+    setRegPassword('');
+    setRegConfirm('');
+  };
+
+  const closeRegister = () => {
+    setShowRegister(false);
+    setRegError('');
+    setRegCompany('');
+    setRegPassword('');
+    setRegConfirm('');
   };
 
   const handleReset = () => {
@@ -504,6 +572,132 @@ const ClientCenterNoLayout = () => {
                 }}
               >
                 {authLoading ? '验证中...' : '查看数据'}
+              </button>
+            </div>
+
+            {/* 注册入口 */}
+            <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+              <span style={{ fontSize: 13, color: '#94a3b8' }}>没有账号？</span>
+              <button
+                onClick={openRegister}
+                style={{
+                  fontSize: 13, fontWeight: 600, color: '#1a3a5c', background: 'none',
+                  border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                  padding: 0, marginLeft: 4,
+                }}
+              >
+                立即注册
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 注册弹窗 */}
+      {showRegister && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 24,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 32, maxWidth: 420, width: '100%',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%', background: '#f0fdf4',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 16px',
+              }}>
+                <UserPlus size={28} color="#16a34a" />
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a5c', marginBottom: 4 }}>客户注册</h3>
+              <p style={{ fontSize: 14, color: '#64748b' }}>输入企业全称和密码完成注册</p>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>企业全称</label>
+              <input
+                type="text"
+                value={regCompany}
+                onChange={(e) => setRegCompany(e.target.value)}
+                placeholder="例如：保定开拓精密仪器制造有限责任公司"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#16a34a'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>设置密码</label>
+              <input
+                type="password"
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+                placeholder="至少6位"
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#16a34a'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>确认密码</label>
+              <input
+                type="password"
+                value={regConfirm}
+                onChange={(e) => setRegConfirm(e.target.value)}
+                placeholder="再次输入密码"
+                onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#16a34a'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            {regError && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14,
+              }}>
+                {regError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+              <button
+                onClick={closeRegister}
+                style={{
+                  flex: 1, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8,
+                  fontSize: 14, fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#475569',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <ArrowLeft size={16} /> 返回
+              </button>
+              <button
+                onClick={handleRegister}
+                disabled={regLoading}
+                style={{
+                  flex: 1, padding: 12, border: 'none', borderRadius: 8,
+                  fontSize: 14, fontWeight: 600, cursor: regLoading ? 'not-allowed' : 'pointer',
+                  background: regLoading ? '#86efac' : '#16a34a', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {regLoading ? '注册中...' : <><UserPlus size={16} /> 注册</>}
               </button>
             </div>
           </div>

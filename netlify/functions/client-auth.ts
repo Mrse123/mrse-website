@@ -172,6 +172,73 @@ export const handler: Handler = async (
       }
     }
 
+      if (action === "register") {
+        // 注册新客户
+        const { companyName, password } = body;
+        if (!companyName || !password) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "公司名称和密码不能为空" }),
+          };
+        }
+        if (password.length < 6) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "密码长度不能少于6位" }),
+          };
+        }
+        // 检查是否已注册
+        const clients = await getClientList(token);
+        const exists = clients.find(
+          (c) => c.companyName === companyName
+        );
+        if (exists) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "该公司已注册，请直接登录" }),
+          };
+        }
+        // 写入飞书表
+        const createRes = await fetch(
+          "https://open.feishu.cn/open-apis/bitable/v1/apps/" +
+            FEISHU_APP_TOKEN +
+            "/tables/" +
+            PASSWORD_TABLE_ID +
+            "/records",
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fields: {
+                公司名称: companyName,
+                密码: password,
+                来源: "客户自主注册",
+              },
+            }),
+          }
+        );
+        const createData = await createRes.json();
+        if (createData.code !== 0) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "注册失败: " + createData.msg }),
+          };
+        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ code: 0, msg: "注册成功" }),
+        };
+      }
+    }
+
     return {
       statusCode: 400,
       headers,
