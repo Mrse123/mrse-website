@@ -125,6 +125,11 @@ const features = [
 const ClientCenterNoLayout = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [pendingCompany, setPendingCompany] = useState<string | null>(null); // 等待密码验证的公司
+  const [password, setPassword] = useState('');
+  const [_authVerified, setAuthVerified] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [patentPage, setPatentPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
@@ -217,24 +222,57 @@ const ClientCenterNoLayout = () => {
   const pendingNotif = companyPatents.filter(p => p['通知状态'] === '待通知').length;
   const noNeed = companyPatents.filter(p => p['通知状态'] === '无需通知').length;
 
-  const handleSearch = async (company: string) => {
-    setSelectedCompany(company);
-    setShowResults(true);
-    setPatentPage(1);
-    setProjectPage(1);
-    setActiveTab('patent');
-    if (!recordsLoaded) {
-      await loadRecords();
+  // 密码验证
+  const handleVerifyPassword = async () => {
+    if (!pendingCompany || !password.trim()) { setAuthError('请输入密码'); return; }
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/.netlify/functions/client-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', companyName: pendingCompany, password: password.trim() }),
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        setAuthVerified(true);
+        setSelectedCompany(pendingCompany);
+        setShowResults(true);
+        setPatentPage(1);
+        setProjectPage(1);
+        setActiveTab('patent');
+        if (!recordsLoaded) await loadRecords();
+        setPendingCompany(null);
+        setPassword('');
+        setTimeout(() => {
+          const el = document.getElementById('search-results');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      } else {
+        setAuthError(data.msg || '验证失败');
+      }
+    } catch {
+      setAuthError('网络错误，请稍后重试');
+    } finally {
+      setAuthLoading(false);
     }
-    setTimeout(() => {
-      const el = document.getElementById('search-results');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
+  };
+
+  const handleSearch = async (company: string) => {
+    // 先弹出密码框
+    setPendingCompany(company);
+    setPassword('');
+    setAuthError('');
+    setAuthVerified(false);
   };
 
   const handleReset = () => {
     setSearchTerm('');
     setSelectedCompany(null);
+    setPendingCompany(null);
+    setPassword('');
+    setAuthVerified(false);
+    setAuthError('');
     setShowResults(false);
     setPatentPage(1);
     setProjectPage(1);
@@ -381,6 +419,96 @@ const ClientCenterNoLayout = () => {
           @media (max-width: 768px) { .hero-grid { grid-template-columns: 1fr !important; gap: 32px !important; } }
         `}</style>
       </section>
+
+      {/* 密码验证弹窗 */}
+      {pendingCompany && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 24,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 32, maxWidth: 420, width: '100%',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%', background: '#eff6ff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 16px',
+              }}>
+                <ShieldCheck size={28} color="#1a3a5c" />
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a5c', marginBottom: 4 }}>身份验证</h3>
+              <p style={{ fontSize: 14, color: '#64748b' }}>
+                请输入 <span style={{ fontWeight: 600, color: '#1a3a5c' }}>{pendingCompany}</span> 的访问密码
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>公司名称</label>
+              <div style={{
+                width: '100%', padding: '10px 14px', background: '#f8fafc',
+                border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#64748b',
+              }}>
+                {pendingCompany}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>密码</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerifyPassword()}
+                placeholder="请输入密码"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#1a3a5c'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            {authError && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 16,
+              }}>
+                {authError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => { setPendingCompany(null); setPassword(''); setAuthError(''); }}
+                style={{
+                  flex: 1, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8,
+                  fontSize: 14, fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#475569',
+                }}
+              >
+                返回
+              </button>
+              <button
+                onClick={handleVerifyPassword}
+                disabled={authLoading}
+                style={{
+                  flex: 1, padding: 12, border: 'none', borderRadius: 8,
+                  fontSize: 14, fontWeight: 600, cursor: authLoading ? 'not-allowed' : 'pointer',
+                  background: authLoading ? '#93c5fd' : '#1a3a5c', color: '#fff',
+                }}
+              >
+                {authLoading ? '验证中...' : '查看数据'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 搜索结果区域 */}
       {showResults && (companyPatents.length > 0 || companyProjects.length > 0) && (
