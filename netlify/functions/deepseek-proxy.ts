@@ -14,7 +14,7 @@ const headers = {
 
 // Step 1: 用 Tavily 搜索公司信息
 async function searchCompanyInfo(company: string) {
-  const query = `${company} 企业简介 经营范围 注册资本 成立时间 行业`;
+  const query = `${company} 企业简介 经营范围 注册资本 行业`;
 
   const response = await fetch(TAVILY_API_URL, {
     method: "POST",
@@ -24,9 +24,10 @@ async function searchCompanyInfo(company: string) {
     },
     body: JSON.stringify({
       query,
-      search_depth: "advanced",
+      search_depth: "basic",
       max_results: 5,
       include_answer: true,
+      include_raw_content: false,
       topic: "general",
     }),
   });
@@ -36,7 +37,26 @@ async function searchCompanyInfo(company: string) {
   }
 
   const data = await response.json();
-  return data;
+
+  // 优先使用中文搜索结果内容拼接摘要，不依赖 Tavily answer（可能是英文）
+  const cnResults = (data.results || [])
+    .filter((r: any) => r.content && /[\u4e00-\u9fff]/.test(r.content))
+    .slice(0, 3);
+
+  let answer = "";
+  if (cnResults.length > 0) {
+    // 拼接中文摘要，取每个结果前200字
+    answer = cnResults
+      .map((r: any) => r.content.replace(/\s+/g, " ").trim().slice(0, 200))
+      .join("\n");
+  } else if (data.answer && /[\u4e00-\u9fff]/.test(data.answer)) {
+    answer = data.answer;
+  }
+
+  return {
+    ...data,
+    answer,
+  };
 }
 
 // Step 2: 用 Tavily 搜索政策
@@ -51,8 +71,8 @@ async function searchPolicies(company: string, industry: string, companyInfo: st
     },
     body: JSON.stringify({
       query,
-      search_depth: "advanced",
-      max_results: 8,
+      search_depth: "basic",
+      max_results: 6,
       include_answer: true,
       topic: "general",
     }),
@@ -143,8 +163,8 @@ ${policyContents}
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.3,
-      max_tokens: 3000,
+      temperature: 0.2,
+      max_tokens: 2000,
     }),
   });
 
@@ -241,22 +261,13 @@ export const handler: Handler = async (
         };
       }
 
-      // Step 1: 搜索公司信息（如果前端没传已有的公司信息）
-      let finalCompanyInfo = companyInfo || "";
-      if (!finalCompanyInfo) {
-        const companyResults = await searchCompanyInfo(company);
-        finalCompanyInfo = companyResults.answer || "";
-      }
+      // Step 1: 使用前端传来的公司信息（已搜索过），省掉重复搜索
+      const finalCompanyInfo = companyInfo || "";
 
       // Step 2: 搜索政策
-      const policyResults = await searchPolicies(
-        company,
-        industry,
-        finalCompanyInfo,
-        revenue || "未提供"
-      );
+      const policyResults = await searchPolicies(company, industry, finalCompanyInfo, revenue || "未提供");
 
-      // Step 3: DeepSeek 生成报告
+      // Step 3: DeepSeek 生成报告（减少 max_tokens 加快速度）
       const report = await generateReport(
         company,
         industry,

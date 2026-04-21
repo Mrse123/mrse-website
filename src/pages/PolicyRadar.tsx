@@ -110,12 +110,20 @@ export default function PolicyRadar() {
     setStep('loading')
     setLoadingPhase('searching-company')
 
-    const phaseTimers = [
-      setTimeout(() => setLoadingPhase('searching-policy'), 4000),
-      setTimeout(() => setLoadingPhase('analyzing'), 10000),
-    ]
+    // 快速切换加载阶段（不依赖固定时间，更自然）
+    const t1 = setTimeout(() => setLoadingPhase('searching-policy'), 2000)
+    const t2 = setTimeout(() => setLoadingPhase('analyzing'), 6000)
+    // 超时保护：60秒后自动报错
+    const t3 = setTimeout(() => {
+      setError('请求超时，请稍后重试')
+      setStep('company-info')
+      setLoading(false)
+    }, 60000)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 55000)
+
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,9 +134,15 @@ export default function PolicyRadar() {
           revenue: revenue || '未提供',
           companyInfo,
         }),
+        signal: controller.signal,
       })
 
-      if (!res.ok) throw new Error('请求失败: ' + res.status)
+      clearTimeout(timeoutId)
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `请求失败: ${res.status}`)
+      }
       const data = await res.json()
 
       if (data.error) throw new Error(data.error)
@@ -136,11 +150,16 @@ export default function PolicyRadar() {
       setReport(data)
       setStep('report')
     } catch (err: any) {
-      setError(err.message || '生成报告失败，请稍后重试')
+      if (err.name === 'AbortError') {
+        setError('请求超时，请稍后重试')
+      } else {
+        setError(err.message || '生成报告失败，请稍后重试')
+      }
       setStep('company-info')
     } finally {
-      clearTimeout(phaseTimers[0])
-      clearTimeout(phaseTimers[1])
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
       setLoading(false)
     }
   }
