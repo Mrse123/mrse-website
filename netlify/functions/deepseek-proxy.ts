@@ -90,9 +90,9 @@ async function searchCompanyInfo(company: string) {
   };
 }
 
-// Step 2: 用 Tavily 搜索政策
-async function searchPolicies(company: string, industry: string, companyInfo: string, revenue: string) {
-  const query = `${industry}行业 企业 政策补贴 申报 高新技术 专精特新 科技型中小企业 ${revenue !== "未提供" ? revenue + "营收" : ""} 河北 保定 2024 2025 2026`;
+// Step 2: 用 Tavily 搜索政策（精简版，加快速度）
+async function searchPolicies(industry: string, revenue: string) {
+  const query = `${industry}行业 政策补贴 申报 高新技术 专精特新 河北 2024 2025`;
 
   const response = await fetch(TAVILY_API_URL, {
     method: "POST",
@@ -103,8 +103,9 @@ async function searchPolicies(company: string, industry: string, companyInfo: st
     body: JSON.stringify({
       query,
       search_depth: "basic",
-      max_results: 6,
+      max_results: 4,
       include_answer: true,
+      include_raw_content: false,
       topic: "general",
     }),
   });
@@ -130,57 +131,45 @@ async function generateReport(company: string, industry: string, revenue: string
     .map((r: any) => `- ${r.title}: ${r.url}`)
     .join("\n") || "";
 
-  const SYSTEM_PROMPT = `你是河北玛仕知识产权服务有限公司的AI政策匹配助手。根据企业信息和网络搜索到的最新政策，生成《政策匹配报告》。
+  const SYSTEM_PROMPT = `你是AI政策匹配助手。根据企业信息和政策搜索结果，生成JSON格式报告。
 
-严格按照以下JSON格式返回，不要返回任何其他内容：
+严格返回以下JSON，不要返回其他内容：
 {
   "company": "企业名称",
   "industry": "行业",
   "revenue": "营收",
-  "companyProfile": "企业概况（2-3句话，基于搜索到的公司信息）",
-  "summary": "AI分析摘要（2-3句话，结合企业信息和政策分析匹配情况）",
-  "totalEstimate": "预计可获补贴总金额范围（如 20-50万元）",
+  "companyProfile": "企业概况（1-2句话）",
+  "summary": "AI分析摘要（1-2句话）",
+  "totalEstimate": "预计可获补贴总金额范围",
   "items": [
     {
       "name": "政策名称",
-      "match": "匹配度百分比（如 90%）",
+      "match": "匹配度百分比",
       "subsidy": "预计补贴金额或优惠",
       "difficulty": "申报难度（低/中/高）",
-      "description": "政策简要说明+企业为何匹配（1-2句话）",
-      "reason": "该企业匹配此政策的具体原因"
+      "description": "政策说明+匹配原因（1句话）",
+      "reason": "匹配此政策的具体原因"
     }
   ],
-  "sources": ["信息来源URL列表"]
+  "sources": ["来源URL"]
 }
 
-重要规则：
-1. 只基于下方提供的搜索结果生成报告，不要编造搜索结果中没有的政策
-2. companyProfile 基于公司搜索信息提炼，不要编造
-3. 每个政策的 reason 字段要结合企业实际情况说明为什么匹配
-4. 如果搜索结果不足，如实说明，不要凭空编造具体金额
-5. 每次匹配3-5个最相关的政策
-6. 匹配度要根据企业实际情况合理分布（不要全部90%以上）
-7. 优先推荐河北及保定本地政策
-8. 补贴金额必须基于搜索到的政策原文，不要猜测
-9. sources 字段填入政策搜索结果的来源URL
+规则：只基于搜索结果生成，不编造；匹配3-4个政策；优先河北本地政策。只返回JSON。`;
 
-只返回JSON，不要加任何markdown代码块标记。`;
+  const policyAnswer = policyResults.answer || "";
+  const policyContents = policyResults.results
+    ?.slice(0, 4)
+    .map((r: any, i: number) => `[${i + 1}] ${r.title}: ${r.content?.slice(0, 150) || ""}`)
+    .join("\n") || "";
 
-  const userPrompt = `=== 企业信息 ===
-企业名称：${company}
-所属行业：${industry}
-年营收规模：${revenue}
+  const userPrompt = `企业：${company} | 行业：${industry} | 营收：${revenue}
+公司信息：${companyInfo || "无"}
 
-=== 公司信息搜索结果 ===
-${companyInfo || "未搜索到该公司的详细信息"}
-
-=== 政策搜索AI摘要 ===
+政策搜索结果：
 ${policyAnswer}
-
-=== 政策搜索结果详情 ===
 ${policyContents}
 
-请基于以上企业信息和政策信息，为该企业生成精准的政策匹配报告。重点分析该企业是否符合各项政策的申报条件。`;
+生成该企业的政策匹配报告。`;
 
   const response = await fetch(DEEPSEEK_API_URL, {
     method: "POST",
@@ -295,8 +284,8 @@ export const handler: Handler = async (
       // Step 1: 使用前端传来的公司信息（已搜索过），省掉重复搜索
       const finalCompanyInfo = companyInfo || "";
 
-      // Step 2: 搜索政策
-      const policyResults = await searchPolicies(company, industry, finalCompanyInfo, revenue || "未提供");
+      // Step 2: 搜索政策（精简查询，加快速度）
+      const policyResults = await searchPolicies(industry, revenue || "未提供");
 
       // Step 3: DeepSeek 生成报告（减少 max_tokens 加快速度）
       const report = await generateReport(
