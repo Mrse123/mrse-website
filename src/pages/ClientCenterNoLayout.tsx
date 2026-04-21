@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2, ClipboardList, UserPlus, ArrowLeft
+  Search, Building2, FileText, ShieldCheck, Star, ArrowRight, Loader2, ClipboardList, UserPlus, ArrowLeft, KeyRound
 } from 'lucide-react';
 
 import projectDataJson from '../data/project_data.json';
@@ -138,6 +138,14 @@ const ClientCenterNoLayout = () => {
   const [regConfirm, setRegConfirm] = useState('');
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
+  // 修改密码相关
+  const [showChangePwd, setShowChangePwd] = useState(false);
+  const [cpCompany, setCpCompany] = useState('');
+  const [cpOldPwd, setCpOldPwd] = useState('');
+  const [cpNewPwd, setCpNewPwd] = useState('');
+  const [cpConfirmPwd, setCpConfirmPwd] = useState('');
+  const [cpError, setCpError] = useState('');
+  const [cpLoading, setCpLoading] = useState(false);
   const [patentPage, setPatentPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -332,6 +340,53 @@ const ClientCenterNoLayout = () => {
     setRegCompany('');
     setRegPassword('');
     setRegConfirm('');
+  };
+
+  // 修改密码
+  const handleChangePwd = async () => {
+    const company = cpCompany.trim();
+    const oldPwd = cpOldPwd.trim();
+    const newPwd = cpNewPwd.trim();
+    const confirm = cpConfirmPwd.trim();
+    if (!company) { setCpError('请输入公司名称'); return; }
+    if (!oldPwd) { setCpError('请输入原密码'); return; }
+    if (!newPwd) { setCpError('请输入新密码'); return; }
+    if (newPwd.length < 6) { setCpError('新密码长度不能少于6位'); return; }
+    if (newPwd !== confirm) { setCpError('两次输入的新密码不一致'); return; }
+    setCpLoading(true);
+    setCpError('');
+    try {
+      const res = await fetch('/.netlify/functions/client-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'changePassword', companyName: company, oldPassword: oldPwd, newPassword: newPwd }),
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        setShowChangePwd(false);
+        setCpCompany(''); setCpOldPwd(''); setCpNewPwd(''); setCpConfirmPwd('');
+        setCpError('');
+      } else {
+        setCpError(data.msg || '修改失败');
+      }
+    } catch {
+      setCpError('网络错误，请稍后重试');
+    } finally {
+      setCpLoading(false);
+    }
+  };
+
+  const openChangePwd = () => {
+    setPendingCompany(null);
+    setShowChangePwd(true);
+    setCpError('');
+    setCpCompany(''); setCpOldPwd(''); setCpNewPwd(''); setCpConfirmPwd('');
+  };
+
+  const closeChangePwd = () => {
+    setShowChangePwd(false);
+    setCpError('');
+    setCpCompany(''); setCpOldPwd(''); setCpNewPwd(''); setCpConfirmPwd('');
   };
 
   const handleReset = () => {
@@ -575,19 +630,34 @@ const ClientCenterNoLayout = () => {
               </button>
             </div>
 
-            {/* 注册入口 */}
-            <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: 13, color: '#94a3b8' }}>没有账号？</span>
-              <button
-                onClick={openRegister}
-                style={{
-                  fontSize: 13, fontWeight: 600, color: '#1a3a5c', background: 'none',
-                  border: 'none', cursor: 'pointer', textDecoration: 'underline',
-                  padding: 0, marginLeft: 4,
-                }}
-              >
-                立即注册
-              </button>
+            {/* 注册 & 修改密码入口 */}
+            <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'center', gap: 24 }}>
+              <div>
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>没有账号？</span>
+                <button
+                  onClick={openRegister}
+                  style={{
+                    fontSize: 13, fontWeight: 600, color: '#1a3a5c', background: 'none',
+                    border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                    padding: 0, marginLeft: 4,
+                  }}
+                >
+                  立即注册
+                </button>
+              </div>
+              <div>
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>忘记密码？</span>
+                <button
+                  onClick={openChangePwd}
+                  style={{
+                    fontSize: 13, fontWeight: 600, color: '#b45309', background: 'none',
+                    border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                    padding: 0, marginLeft: 4,
+                  }}
+                >
+                  修改密码
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -698,6 +768,133 @@ const ClientCenterNoLayout = () => {
                 }}
               >
                 {regLoading ? '注册中...' : <><UserPlus size={16} /> 注册</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 修改密码弹窗 */}
+      {showChangePwd && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 24,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 32, maxWidth: 420, width: '100%',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%', background: '#fffbeb',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 16px',
+              }}>
+                <KeyRound size={28} color="#b45309" />
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a5c', marginBottom: 4 }}>修改密码</h3>
+              <p style={{ fontSize: 14, color: '#64748b' }}>验证原密码后设置新密码</p>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>公司名称</label>
+              <input
+                type="text"
+                value={cpCompany}
+                onChange={(e) => setCpCompany(e.target.value)}
+                placeholder="输入注册时的企业名称"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>原密码</label>
+              <input
+                type="password"
+                value={cpOldPwd}
+                onChange={(e) => setCpOldPwd(e.target.value)}
+                placeholder="输入当前密码"
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>新密码</label>
+              <input
+                type="password"
+                value={cpNewPwd}
+                onChange={(e) => setCpNewPwd(e.target.value)}
+                placeholder="至少6位"
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>确认新密码</label>
+              <input
+                type="password"
+                value={cpConfirmPwd}
+                onChange={(e) => setCpConfirmPwd(e.target.value)}
+                placeholder="再次输入新密码"
+                onKeyDown={(e) => e.key === 'Enter' && handleChangePwd()}
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            {cpError && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 12,
+              }}>
+                {cpError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+              <button
+                onClick={closeChangePwd}
+                style={{
+                  flex: 1, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8,
+                  fontSize: 14, fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#475569',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <ArrowLeft size={16} /> 返回
+              </button>
+              <button
+                onClick={handleChangePwd}
+                disabled={cpLoading}
+                style={{
+                  flex: 1, padding: 12, border: 'none', borderRadius: 8,
+                  fontSize: 14, fontWeight: 600, cursor: cpLoading ? 'not-allowed' : 'pointer',
+                  background: cpLoading ? '#fde68a' : '#b45309', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {cpLoading ? '修改中...' : <><KeyRound size={16} /> 修改密码</>}
               </button>
             </div>
           </div>

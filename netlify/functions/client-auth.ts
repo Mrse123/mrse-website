@@ -171,6 +171,82 @@ export const handler: Handler = async (
         };
       }
 
+      if (action === "changePassword") {
+        // 修改密码
+        const { companyName, oldPassword, newPassword } = body;
+        if (!companyName || !oldPassword || !newPassword) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "请填写完整信息" }),
+          };
+        }
+        if (newPassword.length < 6) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "新密码长度不能少于6位" }),
+          };
+        }
+        // 验证原密码
+        const valid = await verifyClient(token, companyName, oldPassword);
+        if (!valid) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "原密码错误" }),
+          };
+        }
+        // 找到该记录的 record_id
+        const clients = await getClientList(token);
+        const records = await fetchAllRecords(token, PASSWORD_TABLE_ID);
+        const target = records.find(
+          (r) =>
+            (r.fields["公司名称"]?.[0]?.text || r.fields["公司名称"] || "") === companyName
+        );
+        if (!target) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "未找到该公司记录" }),
+          };
+        }
+        // 更新密码
+        const updateRes = await fetch(
+          "https://open.feishu.cn/open-apis/bitable/v1/apps/" +
+            FEISHU_APP_TOKEN +
+            "/tables/" +
+            PASSWORD_TABLE_ID +
+            "/records/" +
+            target.record_id,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: "Bearer " + token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fields: {
+                密码: newPassword,
+              },
+            }),
+          }
+        );
+        const updateData = await updateRes.json();
+        if (updateData.code !== 0) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "修改失败: " + updateData.msg }),
+          };
+        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ code: 0, msg: "密码修改成功" }),
+        };
+      }
+
       if (action === "register") {
         // 注册新客户
         const { companyName, password } = body;
