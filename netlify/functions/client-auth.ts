@@ -154,20 +154,28 @@ export const handler: Handler = async (
             body: JSON.stringify({ code: -1, msg: "公司名称和密码不能为空" }),
           };
         }
-        const valid = await verifyClient(token, companyName, password);
-        if (valid) {
-          // 验证通过，获取年费数据
-          const fees = await getCompanyFees(token, companyName);
+        const clients = await getClientList(token);
+        const client = clients.find((c) => c.companyName === companyName);
+        if (!client) {
           return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({ code: 0, data: fees }),
+            body: JSON.stringify({ code: -2, msg: "该公司未注册，请先注册" }),
           };
         }
+        if (client.password !== password) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -1, msg: "密码错误" }),
+          };
+        }
+        // 验证通过，获取年费数据
+        const fees = await getCompanyFees(token, companyName);
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify({ code: -1, msg: "公司名称或密码错误" }),
+          body: JSON.stringify({ code: 0, data: fees }),
         };
       }
 
@@ -188,17 +196,24 @@ export const handler: Handler = async (
             body: JSON.stringify({ code: -1, msg: "新密码长度不能少于6位" }),
           };
         }
+        // 先检查公司是否存在
+        const clients = await getClientList(token);
+        const client = clients.find((c) => c.companyName === companyName);
+        if (!client) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ code: -2, msg: "该公司未注册" }),
+          };
+        }
         // 验证原密码
-        const valid = await verifyClient(token, companyName, oldPassword);
-        if (!valid) {
+        if (client.password !== oldPassword) {
           return {
             statusCode: 200,
             headers,
             body: JSON.stringify({ code: -1, msg: "原密码错误" }),
           };
         }
-        // 找到该记录的 record_id
-        const clients = await getClientList(token);
         const records = await fetchAllRecords(token, PASSWORD_TABLE_ID);
         const target = records.find(
           (r) =>

@@ -377,10 +377,10 @@ const ClientCenterNoLayout = () => {
   };
 
   const openChangePwd = () => {
-    setPendingCompany(null);
     setShowChangePwd(true);
     setCpError('');
-    setCpCompany(''); setCpOldPwd(''); setCpNewPwd(''); setCpConfirmPwd('');
+    setCpCompany(pendingCompany || '');
+    setCpOldPwd(''); setCpNewPwd(''); setCpConfirmPwd('');
   };
 
   const closeChangePwd = () => {
@@ -800,19 +800,29 @@ const ClientCenterNoLayout = () => {
 
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>公司名称</label>
-              <input
-                type="text"
-                value={cpCompany}
-                onChange={(e) => setCpCompany(e.target.value)}
-                placeholder="输入注册时的企业名称"
-                autoFocus
-                style={{
-                  width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
-                  borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-              />
+              {cpCompany ? (
+                <div style={{
+                  padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8,
+                  fontSize: 14, background: '#f8fafc', color: '#1a3a5c', fontWeight: 500,
+                  boxSizing: 'border-box',
+                }}>
+                  {cpCompany}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={cpCompany}
+                  onChange={(e) => setCpCompany(e.target.value)}
+                  placeholder="输入注册时的企业名称"
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                    borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#b45309'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                />
+              )}
             </div>
 
             <div style={{ marginBottom: 12 }}>
