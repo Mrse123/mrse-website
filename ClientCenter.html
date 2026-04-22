@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客户中心 - 河北玛仕知识产权服务有限公司</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a3a5c 0%, #0a2038 100%); color: #333; }
+        .bg-custom { background: #1a3a5c; }
+        .btn-primary { background: #c8a951; transition: all 0.2s; }
+        .btn-primary:hover { background: #b89a43; transform: translateY(-2px); }
+        .card-border { border: 2px solid rgba(26, 58, 92, 0.1); }
+        .text-brand { color: #c8a951; }
+        .gradient-text { background: linear-gradient(135deg, #c8a951, #b89a43); -webkit-background-clip: text; color: transparent; }
+        .shadow-strong { box-shadow: 0 20px 40px rgba(26, 58, 92, 0.15); }
+        .footer-bg { background: #0a2038; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- 导航栏 -->
+    <div class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-custom w-10 h-10 rounded-lg flex items-center justify-center">
+                        <span class="text-brand font-bold text-lg">玛仕</span>
+                    </div>
+                    <div>
+                        <div class="font-bold text-gray-800">河北玛仕知识产权服务有限公司</div>
+                        <div class="text-xs text-gray-500">MASHI IP SERVICE</div>
+                    </div>
+                </div>
+
+                <!-- 导航 -->
+                <div class="flex space-x-8">
+                    <a href="http://localhost:4173" class="text-gray-600 hover:text-gray-900 font-medium transition">首页</a>
+                    <a href="http://localhost:4173/about" class="text-gray-600 hover:text-gray-900 font-medium transition">关于我们</a>
+                    <a href="http://localhost:4173/services" class="text-gray-600 hover:text-gray-900 font-medium transition">产品服务</a>
+                    <a href="http://localhost:4173/client" class="text-brand font-medium border-b-2 border-brand">客户中心</a>
+                    <a href="http://localhost:4173/contact" class="text-gray-600 hover:text-gray-900 font-medium transition">联系我们</a>
+                    <a href="tel:0312-12345678" class="bg-custom text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition">
+                        <span class="mr-2">📞</span>免费咨询
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页面内容 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <!-- 页头 -->
+        <div class="text-center mb-16">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                客户专属<span class="text-brand">专利年费</span>监控中心
+            </h1>
+            <p class="text-gray-600 text-lg max-w-3xl mx-auto">
+                点击下方客户名称可以直接跳转到对应的飞书专利年费详情页面，查看该客户的所有专利年费详情和最新状态。
+            </p>
+        </div>
+
+        <!-- 客户列表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            <!-- 客户卡片1 -->
+            <div class="bg-white rounded-2xl shadow-strong overflow-hidden card-border hover:shadow-xl transition-shadow duration-300">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">制造业</span>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">54 专利</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">保定市玄云涡喷动力设备研发有限公司</h3>
+                    <a href="https://zq0bghufhln.feishu.cn/base/LF3YbS1fOaqPTWsWo4bcKLe1nRh?table=appb2clMka5nCk0G&view=vew保定市玄云涡喷动"
+                       target="_blank"
+                       class="w-full btn-primary text-white font-medium py-3 px-4 rounded-lg inline-flex justify-center items-center hover:no-underline transition duration-200">
+                        查看专利年费详情 →
+                    </a>
+                </div>
+            </div>
+
+            <!-- 客户卡片2 -->
+            <div class="bg-white rounded-2xl shadow-strong overflow-hidden card-border hover:shadow-xl transition-shadow duration-300">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">科技</span>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">49 专利</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">赛沃精密科技（廊坊）有限公司</h3>
+                    <a href="https://zq0bghufhln.feishu.cn/base/LF3YbS1fOaqPTWsWo4bcKLe1nRh?table=appb2clMka5nCk0G&view=vew赛沃精密科技（廊"
+                       target="_blank"
+                       class="w-full btn-primary text-white font-medium py-3 px-4 rounded-lg inline-flex justify-center items-center hover:no-underline transition duration-200">
+                        查看专利年费详情 →
+                    </a>
+                </div>
+            </div>
+
+            <!-- 客户卡片3 -->
+            <div class="bg-white rounded-2xl shadow-strong overflow-hidden card-border hover:shadow-xl transition-shadow duration-300">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">制造业</span>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">44 专利</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">保定贝佳宝纸塑制品制造有限公司</h3>
+                    <a href="https://zq0bghufhln.feishu.cn/base/LF3YbS1fOaqPTWsWo4bcKLe1nRh?table=appb2clMka5nCk0G&view=vew保定贝佳宝纸塑制"
+                       target="_blank"
+                       class="w-full btn-primary text-white font-medium py-3 px-4 rounded-lg inline-flex justify-center items-center hover:no-underline transition duration-200">
+                        查看专利年费详情 →
+                    </a>
+                </div>
+            </div>
+
+            <!-- 客户卡片4 -->
+            <div class="bg-white rounded-2xl shadow-strong overflow-hidden card-border hover:shadow-xl transition-shadow duration-300">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">科技</span>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">43 专利</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">河北智恒电力科技有限公司</h3>
+                    <a href="https://zq0bghufhln.feishu.cn/base/LF3YbS1fOaqPTWsWo4bcKLe1nRh?table=appb2clMka5nCk0G&view=vew河北智恒电力科技"
+                       target="_blank"
+                       class="w-full btn-primary text-white font-medium py-3 px-4 rounded-lg inline-flex justify-center items-center hover:no-underline transition duration-200">
+                        查看专利年费详情 →
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 指引说明 -->
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-8 mb-12 border border-blue-200">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">📋 客户中心使用说明</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h4 class="font-semibold text-lg text-gray-800 mb-3">第 1 步</h4>
+                    <p class="text-gray-700">访问飞书多维表格，为每个客户创建专属视图。</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-lg text-gray-800 mb-3">第 2 步</h4>
+                    <p class="text-gray-700">生成"仅查看"分享链接，并设置权限为只读。</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-lg text-gray-800 mb-3">第 3 步</h4>
+                    <p class="text-gray-700">点击上方按钮跳转到专属视图页面，查看实时更新。</p>
+                </div>
+            </div>
+            <div class="mt-8 flex justify-center">
+                <a href="https://zq0bghufhln.feishu.cn/base/LF3YbS1fOaqPTWsWo4bcKLe1nRh" target="_blank"
+                   class="inline-flex items-center px-6 py-3 bg-custom text-white font-medium rounded-lg hover:bg-opacity-90 transition duration-200">
+                    <span class="mr-2">📊</span>访问飞书多维表格
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="footer-bg text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-white w-10 h-10 rounded-lg flex items-center justify-center">
+                            <span class="text-brand font-bold text-lg">玛仕</span>
+                        </div>
+                        <div>
+                            <div class="font-bold">河北玛仕知识产权服务有限公司</div>
+                            <div class="text-xs text-blue-300">MASHI IP SERVICE</div>
+                        </div>
+                    </div>
+                    <p class="text-blue-200 text-sm">专业提供专利年费监控和知识产权解决方案。</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-4">服务项目</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-blue-200 hover:text-white transition">专利年费监控</a></li>
+                        <li><a href="#" class="text-blue-200 hover:text-white transition">知识产权服务</a></li>
+                        <li><a href="#" class="text-blue-200 hover:text-white transition">高新企业认定</a></li>
+                        <li><a href="#" class="text-blue-200 hover:text-white transition">项目申报</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-4">联系我们</h4>
+                    <ul class="space-y-2">
+                        <li class="text-blue-200">📞 0312-12345678</li>
+                        <li class="text-blue-200">📧 info@mashipatent.com</li>
+                        <li class="text-blue-200">📍 保定市恒源西路888号3S双创社区</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-4">关于</h4>
+                    <p class="text-blue-200 text-sm mb-4">高新技术企业，科技型中小企业，致力于为企业提供专业的知识产权全生命周期管理服务。</p>
+                    <div class="text-xs text-blue-400">© 2026 河北玛仕知识产权服务有限公司版权所有</div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
