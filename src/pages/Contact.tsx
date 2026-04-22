@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-react'
+import { API_BASE } from '../api'
 
 const contactInfo = [
   {
@@ -55,7 +56,7 @@ export default function Contact() {
     setError('')
 
     try {
-      const res = await fetch('/.netlify/functions/send-contact', {
+      const res = await fetch(`${API_BASE}/api/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
